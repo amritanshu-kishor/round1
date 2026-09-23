@@ -1,0 +1,166 @@
+import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
+import { puzzlesBySet, ROUND_MS, SET_COUNT } from "./puzzles.js";
+import { SET_PASSWORDS } from "./secrets.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
+
+function createState() {
+  const roundStartTime = Date.now();
+  return {
+    currentSet: 1,
+    roundStatus: "ACTIVE",
+    roundStartTime,
+    roundEndTime: roundStartTime + ROUND_MS,
+    remainingOnPause: null,
+    clearedTeamIds: [],
+  };
+}
+
+let game = createState();
+
+function remainingMs() {
+  if (game.roundStatus === "PAUSED") {
+    return Math.max(0, game.remainingOnPause ?? 0);
+  }
+  return Math.max(0, game.roundEndTime - Date.now());
+}
+
+function expireIfNeeded() {
+  if (game.roundStatus === "ACTIVE" && remainingMs() <= 0) {
+    game.roundStatus = "EXPIRED";
+  }
+}
+
+function publicState() {
+  expireIfNeeded();
+  const puzzles = puzzlesBySet[game.currentSet] ?? [];
+  const clearedTeamIds = [...game.clearedTeamIds];
+  return {
+    currentSet: game.currentSet,
+    roundStatus: game.roundStatus,
+    roundStartTime: game.roundStartTime,
+    roundEndTime: game.roundEndTime,
+    remainingMs: remainingMs(),
+    teamsCleared: clearedTeamIds.length,
+    clearedTeamIds,
+    setCount: SET_COUNT,
+    puzzles,
+  };
+}
+
+app.get("/api/state", (_req, res) => {
+  res.json(publicState());
+});
+
+app.post("/api/submit", (req, res) => {
+  expireIfNeeded();
+
+  if (game.roundStatus === "EXPIRED" || game.roundStatus === "COMPLETE") {
+    return res.json({
+      ok: false,
+      reason: "closed",
+      message: "Time's up",
+      setChanged: false,
+      state: publicState(),
+    });
+  }
+
+  const teamRaw = req.body?.teamId;
+  const teamId = Number.parseInt(String(teamRaw ?? "").trim(), 10);
+  if (!Number.isInteger(teamId) || teamId < 1 || teamId > 99) {
+    return res.json({
+      ok: false,
+      reason: "team",
+      message: "Enter a team number",
+      setChanged: false,
+      state: publicState(),
+    });
+  }
+
+  if (game.clearedTeamIds.includes(teamId)) {
+    return res.json({
+      ok: false,
+      reason: "already",
+      message: `Team ${teamId} already cleared`,
+      setChanged: false,
+      state: publicState(),
+    });
+  }
+
+  const password = String(req.body?.password ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "");
+
+  const setBefore = game.currentSet;
+  const expected = String(SET_PASSWORDS[setBefore] ?? "").toUpperCase();
+  const correct = Boolean(expected) && password === expected;
+
+  if (!correct) {
+    game.currentSet = setBefore;
+    return res.json({
+      ok: false,
+      reason: "password",
+      message: "Incorrect password",
+      setChanged: false,
+      state: publicState(),
+    });
+  }
+
+  game.clearedTeamIds.push(teamId);
+
+  if (game.currentSet < SET_COUNT) {
+    game.currentSet += 1;
+  }
+
+  const ids = game.clearedTeamIds;
+  const countLabel =
+    ids.length === 1
+      ? "1 team cleared"
+      : `${ids.length} teams cleared (${ids.join(", ")})`;
+
+  return res.json({
+    ok: true,
+    message: `✓ Team ${teamId} cleared • ${countLabel}`,
+    setChanged: game.currentSet !== setBefore,
+    state: publicState(),
+  });
+});
+
+app.post("/api/timer", (_req, res) => {
+  expireIfNeeded();
+
+  if (game.roundStatus === "EXPIRED" || game.roundStatus === "COMPLETE") {
+    return res.json({ ok: false, state: publicState() });
+  }
+
+  if (game.roundStatus === "PAUSED") {
+    game.roundEndTime = Date.now() + Math.max(0, game.remainingOnPause ?? 0);
+    game.remainingOnPause = null;
+    game.roundStatus = "ACTIVE";
+  } else {
+    game.remainingOnPause = remainingMs();
+    game.roundStatus = "PAUSED";
+  }
+
+  res.json({ ok: true, state: publicState() });
+});
+
+app.post("/api/complete", (_req, res) => {
+  expireIfNeeded();
+  if (game.roundStatus === "ACTIVE" || game.roundStatus === "PAUSED") {
+    game.roundStatus = "COMPLETE";
+  }
+  res.json({ ok: true, state: publicState() });
+});
+
+app.listen(PORT, () => {
+  console.log(`Round 1 board at http://localhost:${PORT}`);
+});

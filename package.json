@@ -1,0 +1,13 @@
+{
+  "name": "round1-0s-and-1s",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Round 1 shared puzzle board — 0s and 1s Will Speak",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

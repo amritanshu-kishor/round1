@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Round 1 — 0s and 1s Will Speak</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="top">
+        <div class="brand">
+          <p class="kicker">CSE Club · Round 1</p>
+          <h1>0s and 1s Will Speak</h1>
+        </div>
+        <div class="top-meta">
+          <div class="set-pill" id="setPill">SET 01</div>
+          <div class="cleared" title="Teams that have finished the round">
+            <span class="cleared-label">Teams cleared</span>
+            <span class="cleared-value" id="teamsCleared">0</span>
+            <span class="cleared-ids" id="clearedIds"></span>
+          </div>
+        </div>
+      </header>
+
+      <main class="board" id="board" aria-live="polite"></main>
+
+      <footer class="dock">
+        <form class="host-form" id="hostForm" autocomplete="off">
+          <label class="field team-field">
+            <span>Team</span>
+            <input
+              id="teamInput"
+              name="teamId"
+              type="number"
+              min="1"
+              max="99"
+              inputmode="numeric"
+              required
+            />
+          </label>
+          <label class="field pass-field">
+            <span>Password</span>
+            <input
+              id="passwordInput"
+              name="password"
+              type="text"
+              maxlength="8"
+              spellcheck="false"
+              autocapitalize="characters"
+              autocomplete="off"
+              required
+            />
+          </label>
+          <button type="submit" id="checkBtn">Check</button>
+        </form>
+      </footer>
+    </div>
+
+    <div class="timer-cluster">
+      <button type="button" class="pause-btn" id="pauseBtn">Pause</button>
+      <div class="timer" id="timer" aria-live="polite">12:00</div>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
