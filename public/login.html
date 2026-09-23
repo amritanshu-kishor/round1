@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Round 1</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; }
+      body {
+        font-family: "IBM Plex Sans", system-ui, sans-serif;
+        background: #12141a;
+        color: #eeeae3;
+        display: grid;
+        place-items: center;
+      }
+      form {
+        width: min(22rem, calc(100% - 2rem));
+        background: #1b1e27;
+        border: 1px solid #2c3140;
+        border-radius: 14px;
+        padding: 1.4rem 1.3rem 1.2rem;
+      }
+      p {
+        font-size: 0.68rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #8a7b5e;
+        margin-bottom: 0.35rem;
+      }
+      h1 {
+        font-family: Georgia, serif;
+        font-size: 1.35rem;
+        font-weight: 500;
+        margin-bottom: 1rem;
+      }
+      input {
+        width: 100%;
+        background: #181b23;
+        border: 1px solid #2c3140;
+        color: #eeeae3;
+        font-family: ui-monospace, monospace;
+        font-size: 1.05rem;
+        letter-spacing: 0.12em;
+        padding: 0.55rem 0.65rem;
+        border-radius: 8px;
+        outline: none;
+      }
+      input:focus { border-color: #8a7b5e; }
+      button {
+        margin-top: 0.75rem;
+        width: 100%;
+        border: 0;
+        background: #eeeae3;
+        color: #15161c;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-size: 0.78rem;
+        padding: 0.7rem;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .err {
+        min-height: 1.1rem;
+        margin-top: 0.65rem;
+        font-size: 0.8rem;
+        color: #d4a194;
+      }
+    </style>
+  </head>
+  <body>
+    <form id="gate" autocomplete="off">
+      <p>CSE Club · Round 1</p>
+      <h1>Enter access password</h1>
+      <input id="password" type="password" name="password" required autofocus />
+      <button type="submit">Open</button>
+      <div class="err" id="err"></div>
+    </form>
+    <script>
+      document.getElementById("gate").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const err = document.getElementById("err");
+        err.textContent = "";
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            password: document.getElementById("password").value,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          err.textContent = "Incorrect password";
+          document.getElementById("password").select();
+          return;
+        }
+        window.location.replace("/");
+      });
+    </script>
+  </body>
+</html>

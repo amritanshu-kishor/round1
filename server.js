@@ -1,14 +1,69 @@
 import express from "express";
 import path from "path";
+import crypto from "crypto";
 import { fileURLToPath } from "url";
 import { puzzlesBySet, ROUND_MS, SET_COUNT } from "./puzzles.js";
-import { SET_PASSWORDS } from "./secrets.js";
+import { SET_PASSWORDS, SITE_PASSWORD } from "./secrets.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
+const GATE_COOKIE = "r1g";
+const GATE_SECRET = "round1-host-gate";
+const GATE_TOKEN = crypto
+  .createHmac("sha256", GATE_SECRET)
+  .update("granted")
+  .digest("hex");
 
 app.use(express.json());
+
+function parseCookie(req, name) {
+  const header = req.headers.cookie || "";
+  for (const part of header.split(";")) {
+    const [key, ...rest] = part.trim().split("=");
+    if (key === name) return decodeURIComponent(rest.join("="));
+  }
+  return "";
+}
+
+function secretsMatch(a, b) {
+  const left = crypto.createHash("sha256").update(String(a)).digest();
+  const right = crypto.createHash("sha256").update(String(b)).digest();
+  return crypto.timingSafeEqual(left, right);
+}
+
+function isAuthed(req) {
+  const got = parseCookie(req, GATE_COOKIE);
+  if (!got || got.length !== GATE_TOKEN.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(got), Buffer.from(GATE_TOKEN));
+  } catch {
+    return false;
+  }
+}
+
+app.post("/api/login", (req, res) => {
+  const password = String(req.body?.password ?? "");
+  if (!secretsMatch(password, SITE_PASSWORD)) {
+    return res.status(401).json({ ok: false, message: "Incorrect password" });
+  }
+  res.setHeader(
+    "Set-Cookie",
+    `${GATE_COOKIE}=${GATE_TOKEN}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${12 * 60 * 60}`
+  );
+  res.json({ ok: true });
+});
+
+app.use((req, res, next) => {
+  if (req.path === "/api/login") return next();
+  if (isAuthed(req)) return next();
+  if (req.path.startsWith("/api")) {
+    return res.status(401).json({ ok: false, reason: "auth" });
+  }
+  res.setHeader("Cache-Control", "no-store");
+  return res.sendFile(path.join(__dirname, "public", "login.html"));
+});
+
 app.use(express.static(path.join(__dirname, "public")));
 
 function createState() {

@@ -1,4 +1,6 @@
 /** Authoritative passwords. Never included in public API responses. */
+export const SITE_PASSWORD = "501180";
+
 export const SET_PASSWORDS = {
   1: "9IL1",
   2: "8CL1",
