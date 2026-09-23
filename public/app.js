@@ -1,11 +1,14 @@
 const boardEl = document.getElementById("board");
 const setPill = document.getElementById("setPill");
+const setMenu = document.getElementById("setMenu");
 const teamsClearedEl = document.getElementById("teamsCleared");
 const clearedIdsEl = document.getElementById("clearedIds");
 const timerEl = document.getElementById("timer");
 const pauseBtn = document.getElementById("pauseBtn");
 const toastEl = document.getElementById("toast");
 const formEl = document.getElementById("hostForm");
+const minsForm = document.getElementById("minsForm");
+const minsInput = document.getElementById("minsInput");
 const teamInput = document.getElementById("teamInput");
 const passwordInput = document.getElementById("passwordInput");
 const checkBtn = document.getElementById("checkBtn");
@@ -14,6 +17,7 @@ let roundEndTime = Date.now() + 12 * 60 * 1000;
 let remainingSnapshot = 12 * 60 * 1000;
 let roundStatus = "ACTIVE";
 let currentSet = null;
+let setCount = 7;
 let toastTimer = null;
 
 function pad(n) {
@@ -72,6 +76,14 @@ function renderPuzzle(puzzle) {
   </article>`;
 }
 
+function renderSetMenu(activeSet) {
+  setMenu.innerHTML = Array.from({ length: setCount }, (_, i) => {
+    const n = i + 1;
+    const active = n === activeSet ? " active" : "";
+    return `<button type="button" class="set-choice${active}" data-set="${n}">${n}</button>`;
+  }).join("");
+}
+
 function applyState(state, options = {}) {
   if (!state) return;
 
@@ -91,12 +103,18 @@ function applyState(state, options = {}) {
   pauseBtn.textContent = roundStatus === "PAUSED" ? "Resume" : "Pause";
   paintTimer();
 
+  if (state.durationMs && document.activeElement !== minsInput) {
+    minsInput.value = String(Math.max(1, Math.round(state.durationMs / 60000)));
+  }
+
   if (options.updatePuzzles === false) {
     return;
   }
 
   const nextSet = Number(state.currentSet);
+  setCount = Number(state.setCount) || 7;
   setPill.textContent = `SET ${String(nextSet).padStart(2, "0")}`;
+  renderSetMenu(nextSet);
   if (nextSet !== currentSet) {
     currentSet = nextSet;
     boardEl.innerHTML = (state.puzzles || []).map(renderPuzzle).join("");
@@ -185,6 +203,44 @@ pauseBtn.addEventListener("click", async () => {
   const res = await fetch("/api/timer", { method: "POST" });
   const data = await res.json();
   applyState(data.state);
+});
+
+minsForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  const mins = minsInput.value;
+  const res = await fetch("/api/clock", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ minutes: mins }),
+  });
+  const data = await res.json();
+  applyState(data.state);
+  showToast(data.ok ? `Timer set to ${mins} min` : data.message, !data.ok);
+});
+
+setPill.addEventListener("click", (e) => {
+  e.stopPropagation();
+  renderSetMenu(currentSet || 1);
+  setMenu.hidden = !setMenu.hidden;
+});
+
+setMenu.addEventListener("click", async (e) => {
+  e.stopPropagation();
+  const btn = e.target.closest("[data-set]");
+  if (!btn) return;
+  const res = await fetch("/api/set", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ set: Number(btn.dataset.set) }),
+  });
+  const data = await res.json();
+  applyState(data.state);
+  setMenu.hidden = true;
+});
+
+document.addEventListener("click", () => {
+  setMenu.hidden = true;
 });
 
 setInterval(paintTimer, 250);

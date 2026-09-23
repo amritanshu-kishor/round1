@@ -20,7 +20,10 @@
           <h1>0s and 1s Will Speak</h1>
         </div>
         <div class="top-meta">
-          <div class="set-pill" id="setPill">SET 01</div>
+          <div class="set-wrap">
+            <button type="button" class="set-pill" id="setPill">SET 01</button>
+            <div class="set-menu" id="setMenu" hidden></div>
+          </div>
           <div class="cleared" title="Teams that have finished the round">
             <span class="cleared-label">Teams cleared</span>
             <span class="cleared-value" id="teamsCleared">0</span>
@@ -64,6 +67,21 @@
     </div>
 
     <div class="timer-cluster">
+      <form class="mins-form" id="minsForm" autocomplete="off">
+        <label class="mins-field">
+          <span>Mins</span>
+          <input
+            id="minsInput"
+            type="number"
+            min="1"
+            max="180"
+            value="12"
+            inputmode="numeric"
+            required
+          />
+        </label>
+        <button type="submit" class="pause-btn" id="minsBtn">Set time</button>
+      </form>
       <button type="button" class="pause-btn" id="pauseBtn">Pause</button>
       <div class="timer" id="timer" aria-live="polite">12:00</div>
     </div>

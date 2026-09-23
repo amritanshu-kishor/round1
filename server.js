@@ -17,6 +17,7 @@ function createState() {
     currentSet: 1,
     roundStatus: "ACTIVE",
     roundStartTime,
+    durationMs: ROUND_MS,
     roundEndTime: roundStartTime + ROUND_MS,
     remainingOnPause: null,
     clearedTeamIds: [],
@@ -48,6 +49,7 @@ function publicState() {
     roundStartTime: game.roundStartTime,
     roundEndTime: game.roundEndTime,
     remainingMs: remainingMs(),
+    durationMs: game.durationMs,
     teamsCleared: clearedTeamIds.length,
     clearedTeamIds,
     setCount: SET_COUNT,
@@ -151,6 +153,51 @@ app.post("/api/timer", (_req, res) => {
   }
 
   res.json({ ok: true, state: publicState() });
+});
+
+app.post("/api/clock", (req, res) => {
+  const minutes = Number(req.body?.minutes);
+  if (!Number.isFinite(minutes) || minutes < 1 || minutes > 180) {
+    return res.json({
+      ok: false,
+      message: "Enter minutes from 1 to 180",
+      state: publicState(),
+    });
+  }
+
+  const ms = Math.round(minutes * 60 * 1000);
+  game.durationMs = ms;
+  game.roundStartTime = Date.now();
+  game.roundEndTime = game.roundStartTime + ms;
+
+  if (game.roundStatus === "PAUSED") {
+    game.remainingOnPause = ms;
+  } else {
+    game.remainingOnPause = null;
+    game.roundStatus = "ACTIVE";
+  }
+
+  res.json({ ok: true, state: publicState() });
+});
+
+app.post("/api/set", (req, res) => {
+  const next = Number.parseInt(String(req.body?.set ?? ""), 10);
+  if (!Number.isInteger(next) || next < 1 || next > SET_COUNT) {
+    return res.json({
+      ok: false,
+      message: `Choose a set from 1 to ${SET_COUNT}`,
+      setChanged: false,
+      state: publicState(),
+    });
+  }
+
+  const setBefore = game.currentSet;
+  game.currentSet = next;
+  res.json({
+    ok: true,
+    setChanged: next !== setBefore,
+    state: publicState(),
+  });
 });
 
 app.post("/api/complete", (_req, res) => {
