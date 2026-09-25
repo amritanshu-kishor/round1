@@ -164,8 +164,21 @@ function showToast(message, isError) {
   }, 2600);
 }
 
+async function apiFetch(url, options = {}) {
+  const headers = Object.assign({}, options.headers || {}, {
+    "X-Auth-Token": window.AUTH_TOKEN || "",
+  });
+  const res = await fetch(url, { ...options, headers });
+  if (res.status === 401) {
+    window.location.href = "/";
+    return null;
+  }
+  return res;
+}
+
 async function fetchState() {
-  const res = await fetch("/api/state");
+  const res = await apiFetch("/api/state");
+  if (!res) return;
   const data = await res.json();
   applyState(data);
 }
@@ -175,7 +188,7 @@ formEl.addEventListener("submit", async (e) => {
   e.stopPropagation();
   if (roundStatus === "EXPIRED" || roundStatus === "COMPLETE") return;
 
-  const res = await fetch("/api/submit", {
+  const res = await apiFetch("/api/submit", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -183,6 +196,7 @@ formEl.addEventListener("submit", async (e) => {
       password: passwordInput.value,
     }),
   });
+  if (!res) return;
   const data = await res.json();
 
   if (!data.ok) {
@@ -200,7 +214,8 @@ formEl.addEventListener("submit", async (e) => {
 });
 
 pauseBtn.addEventListener("click", async () => {
-  const res = await fetch("/api/timer", { method: "POST" });
+  const res = await apiFetch("/api/timer", { method: "POST" });
+  if (!res) return;
   const data = await res.json();
   applyState(data.state);
 });
@@ -209,11 +224,12 @@ minsForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   e.stopPropagation();
   const mins = minsInput.value;
-  const res = await fetch("/api/clock", {
+  const res = await apiFetch("/api/clock", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ minutes: mins }),
   });
+  if (!res) return;
   const data = await res.json();
   applyState(data.state);
   showToast(data.ok ? `Timer set to ${mins} min` : data.message, !data.ok);
@@ -229,11 +245,12 @@ setMenu.addEventListener("click", async (e) => {
   e.stopPropagation();
   const btn = e.target.closest("[data-set]");
   if (!btn) return;
-  const res = await fetch("/api/set", {
+  const res = await apiFetch("/api/set", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ set: Number(btn.dataset.set) }),
   });
+  if (!res) return;
   const data = await res.json();
   applyState(data.state);
   setMenu.hidden = true;
@@ -242,6 +259,10 @@ setMenu.addEventListener("click", async (e) => {
 document.addEventListener("click", () => {
   setMenu.hidden = true;
 });
+
+if (window.location.search) {
+  window.history.replaceState({}, "", "/");
+}
 
 setInterval(paintTimer, 250);
 setInterval(fetchState, 1000);

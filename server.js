@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import crypto from "crypto";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { puzzlesBySet, ROUND_MS, SET_COUNT } from "./puzzles.js";
 import { SET_PASSWORDS, SITE_PASSWORD } from "./secrets.js";
@@ -8,63 +9,17 @@ import { SET_PASSWORDS, SITE_PASSWORD } from "./secrets.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
-const GATE_COOKIE = "r1g";
-const GATE_SECRET = "round1-host-gate";
-const GATE_TOKEN = crypto
-  .createHmac("sha256", GATE_SECRET)
-  .update("granted")
-  .digest("hex");
+
+const validTickets = new Set();
+const validAuthTokens = new Set();
 
 app.use(express.json());
-
-function parseCookie(req, name) {
-  const header = req.headers.cookie || "";
-  for (const part of header.split(";")) {
-    const [key, ...rest] = part.trim().split("=");
-    if (key === name) return decodeURIComponent(rest.join("="));
-  }
-  return "";
-}
 
 function secretsMatch(a, b) {
   const left = crypto.createHash("sha256").update(String(a)).digest();
   const right = crypto.createHash("sha256").update(String(b)).digest();
   return crypto.timingSafeEqual(left, right);
 }
-
-function isAuthed(req) {
-  const got = parseCookie(req, GATE_COOKIE);
-  if (!got || got.length !== GATE_TOKEN.length) return false;
-  try {
-    return crypto.timingSafeEqual(Buffer.from(got), Buffer.from(GATE_TOKEN));
-  } catch {
-    return false;
-  }
-}
-
-app.post("/api/login", (req, res) => {
-  const password = String(req.body?.password ?? "");
-  if (!secretsMatch(password, SITE_PASSWORD)) {
-    return res.status(401).json({ ok: false, message: "Incorrect password" });
-  }
-  res.setHeader(
-    "Set-Cookie",
-    `${GATE_COOKIE}=${GATE_TOKEN}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${12 * 60 * 60}`
-  );
-  res.json({ ok: true });
-});
-
-app.use((req, res, next) => {
-  if (req.path === "/api/login") return next();
-  if (isAuthed(req)) return next();
-  if (req.path.startsWith("/api")) {
-    return res.status(401).json({ ok: false, reason: "auth" });
-  }
-  res.setHeader("Cache-Control", "no-store");
-  return res.sendFile(path.join(__dirname, "public", "login.html"));
-});
-
-app.use(express.static(path.join(__dirname, "public")));
 
 function createState() {
   const roundStartTime = Date.now();
@@ -80,6 +35,60 @@ function createState() {
 }
 
 let game = createState();
+
+app.post("/api/login", (req, res) => {
+  const password = String(req.body?.password ?? "");
+  if (!secretsMatch(password, SITE_PASSWORD)) {
+    return res.status(401).json({ ok: false, message: "Incorrect password" });
+  }
+
+  // Reset server game data on every authentication login
+  game = createState();
+  validAuthTokens.clear();
+
+  const ticket = crypto.randomBytes(16).toString("hex");
+  validTickets.add(ticket);
+  res.json({ ok: true, ticket });
+});
+
+app.use((req, res, next) => {
+  if (req.path === "/api/login") return next();
+
+  if (req.path.startsWith("/api")) {
+    const token = req.headers["x-auth-token"];
+    if (token && validAuthTokens.has(token)) {
+      return next();
+    }
+    return res.status(401).json({ ok: false, reason: "auth" });
+  }
+
+  if (req.path === "/" || req.path === "/index.html") {
+    const ticket = String(req.query?.ticket ?? "");
+    if (ticket && validTickets.has(ticket)) {
+      validTickets.delete(ticket);
+      const token = crypto.randomBytes(16).toString("hex");
+      validAuthTokens.add(token);
+
+      const indexPath = path.join(__dirname, "public", "index.html");
+      let html = fs.readFileSync(indexPath, "utf8");
+      html = html.replace(
+        "</head>",
+        `<script>window.AUTH_TOKEN = ${JSON.stringify(token)};</script></head>`
+      );
+
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+      return res.type("html").send(html);
+    }
+
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    return res.sendFile(path.join(__dirname, "public", "login.html"));
+  }
+
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+  return next();
+});
+
+app.use(express.static(path.join(__dirname, "public")));
 
 function remainingMs() {
   if (game.roundStatus === "PAUSED") {

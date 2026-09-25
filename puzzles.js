@@ -78,6 +78,7 @@ export const puzzlesBySet = {
       title: "Someone shifted the letters",
       type: "varshift",
       letters: ["M", "K", "J", "L", "Y"],
+      hint: "+1, +2, +3, +4, +5",
       focus: 2,
     },
     {
@@ -120,7 +121,7 @@ export const puzzlesBySet = {
       n: 1,
       title: "0s and 1s will speak",
       type: "tokens",
-      tokens: ["0001", "0011", "0101", "0111", "?", "1011"],
+      tokens: ["0011", "0101", "0111", "?", "1011", "1101"],
     },
     {
       n: 2,

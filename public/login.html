@@ -90,12 +90,12 @@
           }),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.ok) {
-          err.textContent = "Incorrect password";
+        if (!res.ok || !data.ok || !data.ticket) {
+          err.textContent = data.message || "Incorrect password";
           document.getElementById("password").select();
           return;
         }
-        window.location.replace("/");
+        window.location.replace("/?ticket=" + encodeURIComponent(data.ticket));
       });
     </script>
   </body>
