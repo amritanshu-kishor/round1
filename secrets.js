@@ -7,6 +7,6 @@ export const SET_PASSWORDS = {
   3: "8NG2",
   4: "7FO3",
   5: "9NE4",
-  6: "9SH5",
-  7: "9OE6",
+  6: "7PH5",
+  7: "7RS3",
 };
